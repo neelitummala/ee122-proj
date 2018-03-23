@@ -9,4 +9,5 @@ class Grid:
         # grid is a 2D numpy array
         
         self.__size = size
-        self.__grid = np.zeros((size,size), Node)
+        self.__grid = np.zeros((size,size), dtype=Node)
+        
