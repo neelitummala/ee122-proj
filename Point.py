@@ -4,8 +4,18 @@ class Point:
     
     def __init__(self, x, y):
         # x and y are integers
-        self.x = x
-        self.y = y
+        self.__x = x
+        self.__y = y
+        
+    def getX(self):
+        return self.__x
+    
+    def getY(self):
+        return self.__y
     
     def distanceToPoint(self, other_point):
-        dx = self.x - other_point.x
+        dx = self.__x - other_point.getX()
+        dy = self.__y - other_point.getY()
+        return math.hypot(dx, dy)
+        
+    
