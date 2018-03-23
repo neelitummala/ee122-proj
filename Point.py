@@ -18,4 +18,8 @@ class Point:
         dy = self.__y - other_point.getY()
         return math.hypot(dx, dy)
         
-    
+    def __str__(self):
+        return "(" + str(self.__x) + "," + str(self.__y) + ")"
+        
+    def __repr__(self):
+        return "Point(" + str(self.__x) + "," + str(self.__y) + ")"
