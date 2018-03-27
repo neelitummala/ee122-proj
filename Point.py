@@ -1,4 +1,5 @@
 import math
+import numpy as np
 
 class Point:
     
@@ -23,3 +24,6 @@ class Point:
         
     def __repr__(self):
         return "Point(" + str(self.__x) + "," + str(self.__y) + ")"
+        
+    def __eq__(self, other):
+        return (self.__x == other.getX()) and (self.__y == other.getY())
