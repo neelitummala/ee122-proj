@@ -14,6 +14,17 @@ class Grid:
         self.__grid = np.zeros((size,size), dtype=Node)
         self.populate(size, 0)
         
+        
+    # TODO: defined as average number of immediately adjacent neighbors that each node
+    #       in the swarm can communicate with
+    def measureSparsity(self):
+        return None
+    
+    # generates a list of neighbors for each Node in the grid
+    def findNeighbors(self):
+        allNeighbors = []
+        return None
+    
     # populates the grid with a swarm of size swarm_size
     def populate(self, swarm_size, seed=None):
         randomCoordinates = self.getRandomCoordinates(swarm_size, seed)
