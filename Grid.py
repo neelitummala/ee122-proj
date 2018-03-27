@@ -16,16 +16,27 @@ class Grid:
     # TODO: complete this fn
     def populate(self, swarm_size, seed=None):
         # populates the grid with a swarm of size swarm_size
+        
         return None
         
-    # TODO: need to generate n points without repeat
+    # returns a list of n unique Points
     def getRandomCoordinates(self, n, seed):
-        x = np.zeros(n)
-        y = np.zeros(n)
+        points = []
         
+		# seed RNG seed
         random.seed(seed)
         
         for i in range(n):
-            x[i] = random.randrange(self.__gridsize)
-        
-        return x
+            x = random.randrange(self.__gridsize)
+            y = random.randrange(self.__gridsize)
+            p = Point(x,y)
+            
+            # used to prevent repeats
+            while(p in points):
+                x = random.randrange(self.__gridsize)
+                y = random.randrange(self.__gridsize)
+                p = Point(x,y)
+            
+            points.append(p)
+            
+        return points
