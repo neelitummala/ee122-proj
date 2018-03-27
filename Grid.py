@@ -12,10 +12,18 @@ class Grid:
         
         self.__gridsize = size
         self.__grid = np.zeros((size,size), dtype=Node)
+        self.populate(size, 0)
         
-    # TODO: complete this fn
+    # populates the grid with a swarm of size swarm_size
     def populate(self, swarm_size, seed=None):
-        # populates the grid with a swarm of size swarm_size
+        randomCoordinates = self.getRandomCoordinates(swarm_size, seed)
+        
+        assert len(randomCoordinates) == swarm_size # sanity check
+        
+        for i in range(swarm_size):
+            c = randomCoordinates.pop()
+            n = Node(i, c)
+            self.__grid[c.getX(), c.getY()] = n
         
         return None
         
@@ -26,7 +34,7 @@ class Grid:
 		# seed RNG seed
         random.seed(seed)
         
-        for i in range(n):
+        for _ in range(n):
             x = random.randrange(self.__gridsize)
             y = random.randrange(self.__gridsize)
             p = Point(x,y)
