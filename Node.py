@@ -12,5 +12,15 @@ class Node:
     def getCoordinate(self):
         return self.__coordinate
         
+    def setCoordinate(self, new_coordinate):
+        self.__coordinate = new_coordinate
+        return
+        
     def distanceToNode(self, other_node):
         return self.__coordinate.distanceToPoint(other_node.getCoordinate())
+        
+    def __str__(self):
+        return "N" + str(self.__id) + " at " + str(self.__coordinate)
+        
+    def __repr__(self):
+        return "N" + str(self.__id)
