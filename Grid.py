@@ -18,13 +18,25 @@ class Grid:
         self.__grid = np.zeros((size,size), dtype=Node)
         self.__devices = []
         self.__allNeighbors = {}
+        
         self.populate(size, 0)
         self.findNeighbors()
+        
+        self.__sparsity = self.measureSparsity()
+        
         
     # TODO: defined as average number of immediately adjacent neighbors that each node
     #       in the swarm can communicate with
     def measureSparsity(self):
-        return None
+        sum = 0
+        neighborLists = self.__allNeighbors.values()
+        for nl in neighborLists:
+            sum += len(nl)
+        
+        return sum / len(neighborLists)
+        
+    def getSparsity(self):
+        return self.__sparsity
     
     # generates a list of neighbors for each Node in the grid
     def findNeighbors(self):
@@ -107,6 +119,8 @@ class Grid:
         render = ""
         for x in range(self.__gridsize):
             for y in range(self.__gridsize):
+                # x,y index ordering is reversed here to
+                # account for numpy matrix ordering
                 s = self.__grid[y,x]
                 if s == 0:
                     render += "--"
