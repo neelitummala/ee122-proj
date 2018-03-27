@@ -116,6 +116,14 @@ class Grid:
         return points
         
     def __str__(self):
+        numDevices = len(self.__devices)
+        zpcount = 0
+        blank = "-"
+        while(numDevices > 0):
+            blank += "-"
+            zpcount += 1
+            numDevices = int(numDevices / 10)
+            
         render = ""
         for x in range(self.__gridsize):
             for y in range(self.__gridsize):
@@ -123,9 +131,9 @@ class Grid:
                 # account for numpy matrix ordering
                 s = self.__grid[y,x]
                 if s == 0:
-                    render += "--"
+                    render += blank
                 else:
-                    render += repr(s)
+                    render += s.renderView(zpcount)
                 render += " "
             render += "\n"
             

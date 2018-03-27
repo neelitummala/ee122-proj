@@ -24,3 +24,9 @@ class Node:
         
     def __repr__(self):
         return "N" + str(self.__id)
+        
+    def renderView(self, zero_padding):
+        r = str(self.__id)
+        for i in range(zero_padding - len(r)):
+            r = "0" + r
+        return "N" + r
