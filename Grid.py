@@ -102,3 +102,25 @@ class Grid:
             points.append(p)
             
         return points
+        
+    def __str__(self):
+        render = ""
+        for x in range(self.__gridsize):
+            for y in range(self.__gridsize):
+                s = self.__grid[y,x]
+                if s == 0:
+                    render += "--"
+                else:
+                    render += repr(s)
+                render += " "
+            render += "\n"
+            
+        return render
+                
+                
+                
+                
+                
+                
+                
+                
