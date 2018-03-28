@@ -9,7 +9,7 @@ class Grid:
     # arbitrary definition of Rx/Tx reachable radius
     __radioRadius = 5
     
-    def __init__(self, size):
+    def __init__(self, size, seed=None):
         # creates a square grid of dimensions size x size
         # grid is a 2D numpy array
         # unpopulated points in the Grid denoted by 0
@@ -19,7 +19,7 @@ class Grid:
         self.__devices = []
         self.__allNeighbors = {}
         
-        self.populate(size, 0)
+        self.populate(int(size*size/5), seed) # guarantees that 1/5 of grid will be occupied
         self.findNeighbors()
         
         self.__sparsity = self.measureSparsity()
@@ -80,7 +80,7 @@ class Grid:
         return self.__grid
     
     # populates the grid with a swarm of size swarm_size
-    def populate(self, swarm_size, seed=None):
+    def populate(self, swarm_size, seed):
         randomCoordinates = self.getRandomCoordinates(swarm_size, seed)
         
         assert len(randomCoordinates) == swarm_size # sanity check
@@ -114,6 +114,23 @@ class Grid:
             points.append(p)
             
         return points
+    
+    # determines if all devices in grid are part of a single
+    # contiguous swarm
+    def isSingleSwarm(self):
+        swarm = []
+        fringe = []
+        startNode = self.__devices[0]
+        
+        fringe.extend(self.__allNeighbors[startNode])
+        
+        while(len(fringe) > 0):
+            n = fringe.pop()
+            if n not in swarm:
+                swarm.append(n)
+                fringe.extend(self.__allNeighbors[n])
+        
+        return len(swarm) == len(self.__devices)
         
     def __str__(self):
         numDevices = len(self.__devices)
