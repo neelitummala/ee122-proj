@@ -1,3 +1,8 @@
+# TODO:
+# implement moveDevice()
+# implement removeDevice()
+# implement mutate()
+
 from Point import *
 from Node import *
 
