@@ -17,6 +17,7 @@ class Grid:
         self.__gridsize = size
         self.__grid = np.zeros((size,size), dtype=Node)
         self.__devices = []
+        self.__idCount = 0
         self.__allNeighbors = {}
         
         self.populate(int(size*size/5), seed) # guarantees that 1/5 of grid will be occupied
@@ -25,7 +26,7 @@ class Grid:
         self.__sparsity = self.measureSparsity()
         
         
-    # TODO: defined as average number of immediately adjacent neighbors that each node
+    # defined as average number of immediately adjacent neighbors that each node
     #       in the swarm can communicate with
     def measureSparsity(self):
         sum = 0
@@ -39,7 +40,9 @@ class Grid:
         return self.__sparsity
     
     # generates a list of neighbors for each Node in the grid
-    def findNeighbors(self):
+    # if singleDevice is None, will find neighbors for all devices
+    # if singleDevice is not None, will only find neighbors for that device
+    def findNeighbors(self, singleDevice=None):
         
         # helper function for fast localized neighbor search
         # returns [upperLeftX, upperLeftY, lowerRightX, lowerRightY]
@@ -59,8 +62,20 @@ class Grid:
             if lry > (self.__gridsize - 1):
                 lry = (self.__gridsize - 1)
             return [ulx, uly, lrx, lry]
-            
-        for d in self.__devices:
+        
+        if singleDevice == None:
+            for d in self.__devices:
+                neighbors = []
+                ulx, uly, lrx, lry = getRadiusCorners(d.getCoordinate())
+                for x in range(ulx,lrx+1):
+                    for y in range(uly,lry+1):
+                        n = self.__grid[x,y]
+                        if (type(n) == Node) and (n != d) and (n.distanceToNode(d) < self.__radioRadius):
+                            neighbors.append(n)
+                            
+                self.__allNeighbors[d] = neighbors
+        else:
+            d = singleDevice
             neighbors = []
             ulx, uly, lrx, lry = getRadiusCorners(d.getCoordinate())
             for x in range(ulx,lrx+1):
@@ -76,6 +91,21 @@ class Grid:
     def getNeighborsDict(self):
         return self.__allNeighbors
     
+    # adds a new Device to Grid
+    def addDevice(self, newNode):
+        newX = newNode.getX()
+        newY = newNode.getY()
+        if type(self.__grid[newX, newY]) == Node:
+            print("Coordinate already occupied!)
+            return false
+        else:
+            self.__idCount += 1
+            self.__devices.append(Node)
+            self.__grid[newX, newY] = newNode
+            self.findNeighbors(newNode)
+            return true
+        
+    
     def getGrid(self):
         return self.__grid
     
@@ -90,6 +120,7 @@ class Grid:
             n = Node(i, c)
             self.__grid[c.getX(), c.getY()] = n
             self.__devices.append(n)
+            self.__idCount += 1
         
         return None
         
@@ -133,7 +164,7 @@ class Grid:
         return len(swarm) == len(self.__devices)
         
     def __str__(self):
-        numDevices = len(self.__devices)
+        numDevices = self.__idCount
         zpcount = 0
         blank = "-"
         while(numDevices > 0):
