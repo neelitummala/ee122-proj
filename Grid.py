@@ -75,7 +75,7 @@ class Grid:
                 for x in range(ulx,lrx+1):
                     for y in range(uly,lry+1):
                         n = self.__grid[x,y]
-                        if (type(n) == Node) and (n != d) and (n.distanceToNode(d) < self.__radioRadius):
+                        if (type(n) == Node) and (n != d) and (n.distanceToNode(d) <= self.__radioRadius):
                             neighbors.append(n)
                             
                 self.__allNeighbors[d] = neighbors
@@ -86,7 +86,7 @@ class Grid:
             for x in range(ulx,lrx+1):
                 for y in range(uly,lry+1):
                     n = self.__grid[x,y]
-                    if (type(n) == Node) and (n != d) and (n.distanceToNode(d) < self.__radioRadius):
+                    if (type(n) == Node) and (n != d) and (n.distanceToNode(d) <= self.__radioRadius):
                         neighbors.append(n)
                         
             self.__allNeighbors[d] = neighbors
@@ -95,20 +95,44 @@ class Grid:
     
     def getNeighborsDict(self):
         return self.__allNeighbors
+        
+    # moves device from one coordinate to another in Grid
+    # 1. make sure device is in Grid
+    # 2. make sure new location is empty
+    # 3. make a copy of device's current neighbors
+    # 4. set new grid location to node
+    # 5. set current grid location to 0
+    # 6. update node neighbors and new neighbors' neighbors
+    # 7. update old neighbors' neighbors
+    def moveDevice(self, currX, currY, newX, newY):
+        if type(self.__grid[currX, currY]) != Node:
+            print("No Node found at " + str(Point(currX, currY))
+            return False
+        elif type(self.__grid[newX, newY]) == Node:
+            print(str(Point(newX, newY)) + " is not empty")
+            return False
     
     # adds a new Device to Grid
     def addDevice(self, newNode):
-        newX = newNode.getX()
-        newY = newNode.getY()
+        if (newNode in self.__devices):
+            print("Node already in grid")
+            return False
+            
+        newX = newNode.getCoordinate().getX()
+        newY = newNode.getCoordinate().getY()
         if type(self.__grid[newX, newY]) == Node:
-            print("Coordinate already occupied!)
-            return false
+            print("Coordinate already occupied!")
+            return False
         else:
+            newNode.setID(self.__idCount)
             self.__idCount += 1
             self.__devices.append(Node)
             self.__grid[newX, newY] = newNode
             self.findNeighbors(newNode)
-            return true
+            # need to also update the neighbors list of all new neighbors
+            for n in self.__allNeighbors[newNode]:
+                self.findNeighbors(n)
+            return True
         
     
     def getGrid(self):
