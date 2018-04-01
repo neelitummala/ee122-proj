@@ -96,6 +96,13 @@ class Grid:
     def getNeighborsDict(self):
         return self.__allNeighbors
         
+    def getNode(self, x, y):
+        if type(self.__grid[x,y]) != Node:
+            print("No Node found at " + str(Point(x, y)))
+            return False
+        else:
+            return self.__grid[x,y]
+        
     # moves device from one coordinate to another in Grid
     # 1. make sure device is in Grid
     # 2. make sure new location is empty
@@ -106,11 +113,24 @@ class Grid:
     # 7. update old neighbors' neighbors
     def moveDevice(self, currX, currY, newX, newY):
         if type(self.__grid[currX, currY]) != Node:
-            print("No Node found at " + str(Point(currX, currY))
+            print("No Node found at " + str(Point(currX, currY)))
             return False
         elif type(self.__grid[newX, newY]) == Node:
             print(str(Point(newX, newY)) + " is not empty")
             return False
+        else:
+            movingNode = self.__grid[currX, currY]
+            oldNeighbors = self.__allNeighbors[movingNode]
+            self.__grid[currX, currY] = 0
+            movingNode.setCoordinate(Point(newX,newY))
+            self.__grid[newX, newY] = movingNode
+            self.findNeighbors(movingNode)
+            for n in self.__allNeighbors[movingNode]:
+                self.findNeighbors(n)
+            for on in oldNeighbors:
+                self.findNeighbors(on)
+            
+            return True
     
     # adds a new Device to Grid
     def addDevice(self, newNode):

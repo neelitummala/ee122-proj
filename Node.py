@@ -16,6 +16,10 @@ class Node:
         self.__coordinate = new_coordinate
         return
         
+    def setID(self, id):
+        self.__id = id
+        return
+        
     def distanceToNode(self, other_node):
         return self.__coordinate.distanceToPoint(other_node.getCoordinate())
         
