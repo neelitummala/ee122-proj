@@ -32,7 +32,7 @@ class Grid:
         
         
     # defined as average number of immediately adjacent neighbors that each node
-    #       in the swarm can communicate with
+    # in the swarm can communicate with
     def measureSparsity(self):
         sum = 0
         neighborLists = self.__allNeighbors.values()
