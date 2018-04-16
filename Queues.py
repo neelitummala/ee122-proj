@@ -16,16 +16,16 @@ class QueueHolder:
 
 class PacketQueue:
     
-    def __init__(self, node, bufferSize=5):
+    def __init__(self, node, bufferLimit=5):
         self.__node = node
-        self.__bufferSize = 5
+        self.__bufferLimit = bufferLimit
         self.__buffer = queue.Queue(maxsize=self.__bufferSize) 
     
     def getNode(self):
         return self.__node
     
-    def getBufferSize(self):
-        return self.__bufferSize
+    def getBufferLimit(self):
+        return self.__bufferLimit
     
     def getBuffer(self):
         return self.__buffer
@@ -38,3 +38,5 @@ class PacketQueue:
             return None
         return self.__buffer.get()
     
+    def getBufferLength(self):
+        return len(self.__buffer)

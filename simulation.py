@@ -49,24 +49,61 @@ def transmissions(grid, numNodes):
 
 class Simulation:
     """
-        Initializes variables for the simulation.
+        Runs various simulations.
     """
     def __init__(self, grid):
         self.grid = grid
-        self.numNodes = len(grid.getNeighborsDict())
+        self.neighbors = grid.getNeighborsDict()
+        self.numNodes = len(self.neighbors)
+        self.timeSlot = 0
    
-    # randomly choose the source and destination nodes
+        # randomly choose the source and destination nodes
         choice = np.random.choice(numNodes, 2, replace=False)
         self.source = choice[0]
-        self.dest = choice[1]
+        self.target = choice[1]
         
-    def runAODV(self):
-        queues = QueueHolder(numNodes)
-        pathFound = False # tells us whether the simulation should end or not
-        timeSlot = 0
+        aodv = AODVSimulation(self.source, self.target, self.numNodes)
         
-        while not pathFound:
-            for node in transmissions(grid, numNodes):
-                continue
+        while not aodv.finished():
+            run()
         
-        timeSlot += 1 # increment timeslot
+    def run(self):
+        send = transmissions(self.grid, self.numNodes)
+        if not aodv.finished():
+            aodv.step()
+        mutate()
+            
+    def mutate(self):
+        # mutates grid and updates everything every timeslot
+        # TODO: incorporate Hall's mutate function
+        # TODO: update neighbors
+        self.timeSlot += 1
+        return
+        
+class AODVSimulation:
+    
+    def __init__(self, source, target, numNodes):
+        self.__source = source
+        self.__target = target
+        self.__numNodes = numNodes
+        self.__queues = QueueHolder(numNodes)
+        self.__finished = False
+        beginDiscover(0)
+        
+    def beginDiscover(self, timeSlot):
+        # put route request packet into source's queue
+        self.__queues[self.__source].addToBuffer(RouteRequest(timeSlot, self.__source, self.__target))
+        
+    def step(self, timeSlot, grid, neighbors, transmissions):
+        for node in transmissions:
+            if self.__queues[node].getBufferLength: # if queue is not empty, send packet out to neighbors
+                neighbors = self.neighbors[node]
+                for neighbor in neighbors:
+                    self.__queues[neighbor].addToBuffer(RouteRequest(timeSlot, self.__source, self.__target))
+
+    def getQueues(self):
+        return self.__queues
+                    
+    def isFinished(self):
+        return self.__finished
+            
