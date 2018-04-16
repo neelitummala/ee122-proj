@@ -4,6 +4,7 @@ class Packet:
         self.__time_stamp = time_stamp
         self.__source = source
         self.__destination = destination
+        self.__type = ''
 
     def getTimeStamp(self):
         # get packet time stamp
@@ -16,3 +17,17 @@ class Packet:
     def getDestination(self):
         # get packet destination
         return self.__destination
+    
+    def getType(self):
+        return self.__type
+
+class RouteRequest(Packet):
+    
+    def __init__(self):
+        self.__type = 'RouteRequest'
+        
+        
+class RouteReply(Packet):
+    
+    def __init__(self):
+        self.__type = 'RouteReply'

@@ -1,7 +1,10 @@
 # File for running simulation
 
 import numpy as np
-import Grid 
+
+from Grid import *
+from Packet import *
+from Queues import *
 
 def get_p(grid, node):
     """
@@ -23,7 +26,7 @@ def get_p(grid, node):
     # for now return a constant
     return 0.5
 
-def transmissions(grid):
+def transmissions(grid, numNodes):
     """
         Which nodes transmit in the current timeslot.
 
@@ -37,7 +40,6 @@ def transmissions(grid):
         :obj:list
             list of nodes that will transmit in the current timeslot
     """
-    numNodes = grid.__idCount
     transmissions = []
     for node in np.arange(numNodes):
         p = get_p(grid, node)
@@ -45,24 +47,26 @@ def transmissions(grid):
             transmissions.append(node)
     return transmissions
 
-def run_simulation():
+class Simulation:
     """
-        Which nodes transmit in the current timeslot.
-
-        Parameters
-        ----------
-        grid: Grid object
-            the grid of the swarm
-
-        Returns
-        -------
-        :obj:list
-            list of nodes that will transmit in the current timeslot
+        Initializes variables for the simulation.
     """
-    grid = Grid(10)
-    
-    return
-
-if __name__ == "__main__":
-	test_grid = Grid(10)
-	print(test_grid)
+    def __init__(self, grid):
+        self.grid = grid
+        self.numNodes = len(grid.getNeighborsDict())
+   
+    # randomly choose the source and destination nodes
+        choice = np.random.choice(numNodes, 2, replace=False)
+        self.source = choice[0]
+        self.dest = choice[1]
+        
+    def runAODV(self):
+        queues = QueueHolder(numNodes)
+        pathFound = False # tells us whether the simulation should end or not
+        timeSlot = 0
+        
+        while not pathFound:
+            for node in transmissions(grid, numNodes):
+                continue
+        
+        timeSlot += 1 # increment timeslot
