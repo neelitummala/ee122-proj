@@ -1,9 +1,10 @@
 class Packet:
-
+    # super class for all packets
+    
     def __init__(self, time_stamp, source, destination):
-        self.__time_stamp = time_stamp
-        self.__source = source
-        self.__destination = destination
+        self.__time_stamp = time_stamp # when the packet originated
+        self.__source = source # the source
+        self.__destination = destination # the target
 
     def getTimeStamp(self):
         # get packet time stamp
@@ -18,11 +19,12 @@ class Packet:
         return self.__destination
 
 class RouteRequest(Packet):
+    # AODV route request packet 
     
     def __init__(self, time_stamp, source, destination):
         Packet.__init__(self, time_stamp, source, destination)
         self.__type = 'RouteRequest'
-        self.__path = []
+        self.__path = [] # path that the request has taken
 
     def getType(self):
         return self.__type
@@ -34,11 +36,12 @@ class RouteRequest(Packet):
         return self.__path
         
 class RouteReply(Packet):
+    # AODV route reply packet
     
     def __init__(self, time_stamp, source, destination, path):
         Packet.__init__(self, time_stamp, source, destination)
         self.__type = 'RouteReply'
-        self.__path = path
+        self.__path = path # reverse path from target -> source
         self.__retransmits = 0 # number of times this packet has been retransmitted
 
     def getType(self):
@@ -51,7 +54,9 @@ class RouteReply(Packet):
         return self.__path
     
     def retransmit(self):
+        # when the packet gets sent back into a queue, increment the number of times it has been re-transmitted.
+        # this happens when a reverse path gets broken by movement of the swarm
         self.__retransmits += 1
     
-    def returnRetransmits(self):
+    def getRetransmits(self):
         return self.__retransmits
