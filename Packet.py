@@ -35,9 +35,20 @@ class RouteRequest(Packet):
         
 class RouteReply(Packet):
     
-    def __init__(self, time_stamp, source, destination):
+    def __init__(self, time_stamp, source, destination, path):
         Packet.__init__(self, time_stamp, source, destination)
         self.__type = 'RouteReply'
+        self.__path = path
+        self.__retransmits = 0 # number of times this packet has been retransmitted
 
     def getType(self):
         return self.__type
+    
+    def setPath(self, path):
+        self.__path = path
+        
+    def getPath(self):
+        return self.__path
+    
+    def returnRetransmits(self):
+        return self.__retransmits

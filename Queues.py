@@ -1,4 +1,4 @@
-import queue
+from collections import deque
 
 class QueueHolder:
     
@@ -18,8 +18,8 @@ class PacketQueue:
     
     def __init__(self, node, bufferLimit=5):
         self.__node = node
-        self.__bufferLimit = bufferLimit
-        self.__buffer = queue.Queue(maxsize=self.__bufferSize) 
+        self.__bufferLimit = bufferLimit # anything added if the queue is full will be dropped
+        self.__buffer = deque(maxlen=self.__bufferSize) # two-sided queue
     
     def getNode(self):
         return self.__node
@@ -30,13 +30,16 @@ class PacketQueue:
     def getBuffer(self):
         return self.__buffer
     
-    def addToBuffer(self, packet):
-        self.__buffer.put(packet)
+    def pushToBack(self, packet):
+        self.__buffer.append(packet)
+        
+    def pushToFront(self, packet):
+        self.__buffer.appendleft(packet)
         
     def pullFromBuffer(self):
-        if self.__buffer.empty():
+        if not len(self.__buffer):
             return None
-        return self.__buffer.get()
+        return self.__buffer.pop()
     
     def getBufferLength(self):
         return len(self.__buffer)
