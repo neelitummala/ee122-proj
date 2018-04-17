@@ -59,11 +59,13 @@ class Simulation:
         
         # instantiate neighbors in a better way (by just integers instead of nodes)
         newDict = {}
+        self.nodes = []
         for key in self.neighbors.keys():
             keyID = key.getID()
-            nodes = self.neighbors[key]
+            self.nodes.append(keyID)
+            neighbors = self.neighbors[key]
             newList = []
-            for n in nodes:
+            for n in neighbors:
                 newList.append(n.getID())
             newDict[keyID] = newList
         self.neighbors = newDict
@@ -76,17 +78,25 @@ class Simulation:
         self.source = choice[0]
         self.target = choice[1]
         
-        self.aodv = AODVSimulation(self.source, self.target, self.numNodes)
+#         self.aodv = AODVSimulation(self.source, self.target, self.numNodes)
         
-        while (not self.aodv.isFinished()) and (self.timeSlot < self.maxTimeslots):
+#         while (not self.aodv.isFinished()) and (self.timeSlot < self.maxTimeslots):
+#             send = transmissions(self.grid, self.numNodes)
+#             self.aodv.step(self.timeSlot, self.grid, self.neighbors, send)
+#             self.mutate()
+        self.olsr = OLSRSimulation(self.source, self.target, self.numNodes)
+        self.olsr.chooseMPR(self.grid, self.nodes, self.neighbors)
+
+        while (not self.olsr.isFinished()) and (self.timeSlot < self.maxTimeslots):
             send = transmissions(self.grid, self.numNodes)
-            self.aodv.step(self.timeSlot, self.grid, self.neighbors, send)
+            self.olsr.step(self.timeSlot, self.grid, self.neighbors, send)
             self.mutate()
-                               
+        
     def mutate(self):
         # mutates grid and updates everything every timeslot
         # TODO: incorporate Hall's mutate function
         # TODO: update neighbors
+        # TODO: update MPRs for OLSR
         self.timeSlot += 1
         return
         
@@ -176,7 +186,88 @@ class OLSRSimulation:
         self.__retry = retry # number of times node should try to re-transmit a packet
         self.__queues = QueueHolder(numNodes)
         self.__finished = False
-        self.__destinationReached = False
         self.__lastTimeout = 0 # time at which the last timeout occurred
+        self.__received = [None]*self.__numNodes # array of timestamps that record what RREQ packet a node has received (so it doesn't retransmit it)
+        self.__MPR = {}
+        for node in np.arange(numNodes):
+            self.__MPR[node] = []
+        self.__routingTable = [0]*self.__numNodes
         self.beginDiscover(0)
+        
+        # measurement variables for comparisons
+        self.__totalTimeslots = 0
+        self.__totalOverhead = 0
+        
+    def beginDiscover(self, timeSlot):
+        # put route request packet into source's queue. This happens at the beginning and when we reach timeout
+        packet = RouteRequest(timeSlot, self.__source, self.__target)
+        packet.addToPath(self.__source)
+        self.__queues.getQueue(self.__source).pushToBack(packet)
+        self.__received[self.__source] = timeSlot # record the timestamp of the packet
+        
+        packet = LinkState(timeSlot, self.__target)
+        packet.addToPath(self.__target)
+        self.__queues.getQueue(self.__target).pushToBack(packet)
+        
+    def chooseMPR(self, grid, nodes, neighborsDict):
+        # gather all two-hop neighbors
+        for node in nodes:
+            twoHopNeighbors = set()
+            # set of MPRs needs to cover all two-hop neighbors of the node
+            for neighbor in neighborsDict[node]:
+                for twoHop in neighborsDict[neighbor]:
+                    if twoHop != node and twoHop not in neighborsDict[node]: # not current node and not first-hop neighbor
+                        twoHopNeighbors.add(twoHop)
+            # now find MPRs
+            shuffledNeighbors = copy.deepcopy(neighborsDict[node])
+            np.random.shuffle(shuffledNeighbors)
+            for neighbor in shuffledNeighbors:
+                intersection = twoHopNeighbors & set(neighborsDict[neighbor])
+                if len(intersection):
+                    twoHopNeighbors = twoHopNeighbors - intersection
+                    self.__MPR[node].append(neighbor)
+                    
+    def step(self, timeSlot, grid, neighborsDict, transmissions):
+        # if it has been longer than timeout time slots, put a discovery packet back in the source node's queue
+        if timeSlot - self.__lastTimeout > self.__timeout: # if timeout occurs, source should send out another RREQ
+            self.beginDiscover(timeSlot)
+            self.__lastTimeout = timeSlot
             
+        for node in transmissions:
+            if self.__queues.getQueue(node).getBufferLength(): # if queue is not empty, send packet out to MPRs
+                MPRs = self.__MPR[node]
+                packet = self.__queues.getQueue(node).pullFromBuffer() 
+                sent = False # if the packet doesn't get sent this whole loop, we need to retransmit it
+                for MPR in MPRs:
+                    if packet.getType() == 'RouteRequest':
+                        # if the destination is in the neighbor's routing table, then there is a route and we've finished
+                        if self.__routingTable[node] == 1:
+                            self.__finished = True
+                            self.__totalTimeslots = timeSlot
+                            print("Total timeslots: "+str(self.__totalTimeslots))
+                            print("Total overhead: "+str(self.__totalOverhead))
+                            print("Finished")
+                            return
+                        elif (self.__received[MPR] is None) or (self.__received[MPR] < packet.getTimeStamp()):
+                            # if we havent received this request before
+                            newPacket = copy.deepcopy(packet) # copy the packet so we don't have pointers
+                            newPacket.addToPath(MPR)
+                            self.__queues.getQueue(MPR).pushToBack(newPacket)
+                            self.__received[MPR] = packet.getTimeStamp()
+                        sent = True
+                        self.__totalOverhead += 1
+                    if packet.getType() == 'LinkState':
+                        self.__routingTable[node] = 1
+                        newPacket = copy.deepcopy(packet) # copy the packet so we don't have pointers
+                        newPacket.addToPath(MPR)
+                        self.__queues.getQueue(MPR).pushToBack(newPacket)
+                        self.__totalOverhead += 1
+                if not sent:
+                    packet.retransmit()
+                    self.__queues.getQueue(node).pushToFront(packet)
+                        
+    def isFinished(self):
+        return self.__finished
+    
+    def getMPR(self):
+        return self.__MPR

@@ -60,3 +60,35 @@ class RouteReply(Packet):
     
     def getRetransmits(self):
         return self.__retransmits
+    
+class LinkState():
+    # OLSR link state packet
+    def __init__(self, time_stamp, source):
+        self.__type = 'LinkState'
+        self.__timeStamp = time_stamp
+        self.__source = source
+        self.__retransmits = 0
+        self.__path = []
+        
+    def getSource(self):
+        return self.__source
+    
+    def getTimestamp(self):
+        return self.__timeStamp
+    
+    def getType(self):
+        return self.__type
+    
+    def retransmit(self):
+        # when the packet gets sent back into a queue, increment the number of times it has been re-transmitted.
+        # this happens when a reverse path gets broken by movement of the swarm
+        self.__retransmits += 1
+    
+    def getRetransmits(self):
+        return self.__retransmits
+    
+    def addToPath(self, node):
+        self.__path.append(node)
+        
+    def getPath(self):
+        return self.__path
