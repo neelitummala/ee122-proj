@@ -25,7 +25,7 @@ def get_p(grid, node):
     """
     # TODO: change probability of transmission based on number of neighbors
     # for now return a constant
-    return 0.1
+    return 0.3
 
 def transmissions(grid, numNodes):
     """
@@ -78,20 +78,23 @@ class Simulation:
         self.source = choice[0]
         self.target = choice[1]
         
-#         self.aodv = AODVSimulation(self.source, self.target, self.numNodes)
-        
-#         while (not self.aodv.isFinished()) and (self.timeSlot < self.maxTimeslots):
-#             send = transmissions(self.grid, self.numNodes)
-#             self.aodv.step(self.timeSlot, self.grid, self.neighbors, send)
-#             self.mutate()
+        self.aodv = AODVSimulation(self.source, self.target, self.numNodes)
         self.olsr = OLSRSimulation(self.source, self.target, self.numNodes)
         self.olsr.chooseMPR(self.grid, self.nodes, self.neighbors)
 
-        while (not self.olsr.isFinished()) and (self.timeSlot < self.maxTimeslots):
+        while (not self.olsr.isFinished() or not self.aodv.isFinished()) and (self.timeSlot < self.maxTimeslots):
             send = transmissions(self.grid, self.numNodes)
-            self.olsr.step(self.timeSlot, self.grid, self.neighbors, send)
+            if not self.aodv.isFinished():
+                self.aodv.step(self.timeSlot, self.grid, self.neighbors, send)
+            if not self.olsr.isFinished():
+                self.olsr.step(self.timeSlot, self.grid, self.neighbors, send)
             self.mutate()
-        
+            
+
+    def end(self):
+        # return results
+        return [self.aodv.returnTimeslots(), self.aodv.returnOverhead(), self.olsr.returnTimeslots(), self.olsr.returnOverhead()]
+
     def mutate(self):
         # mutates grid and updates everything every timeslot
         # TODO: incorporate Hall's mutate function
@@ -155,6 +158,7 @@ class AODVSimulation:
                         if neighbor == packet.getDestination(): # done with simulation because the reply packet has reached the source
                             self.__finished = True
                             self.__totalTimeslots = timeSlot
+                            print("AODV")
                             print("Total timeslots: "+str(self.__totalTimeslots))
                             print("Total overhead: "+str(self.__totalOverhead))
                             print("Finished")
@@ -176,6 +180,12 @@ class AODVSimulation:
     def isFinished(self):
         return self.__finished
     
+    def returnOverhead(self):
+        return self.__totalOverhead
+    
+    def returnTimeslots(self):
+        return self.__totalTimeslots
+    
 class OLSRSimulation:
     
     def __init__(self, source, target, numNodes, timeout=10, retry=3):
@@ -192,6 +202,7 @@ class OLSRSimulation:
         for node in np.arange(numNodes):
             self.__MPR[node] = []
         self.__routingTable = [0]*self.__numNodes
+        self.__numMPR = 0
         self.beginDiscover(0)
         
         # measurement variables for comparisons
@@ -226,6 +237,7 @@ class OLSRSimulation:
                 if len(intersection):
                     twoHopNeighbors = twoHopNeighbors - intersection
                     self.__MPR[node].append(neighbor)
+                    self.__numMPR += 1
                     
     def step(self, timeSlot, grid, neighborsDict, transmissions):
         # if it has been longer than timeout time slots, put a discovery packet back in the source node's queue
@@ -244,6 +256,7 @@ class OLSRSimulation:
                         if self.__routingTable[node] == 1:
                             self.__finished = True
                             self.__totalTimeslots = timeSlot
+                            print("OLSR")
                             print("Total timeslots: "+str(self.__totalTimeslots))
                             print("Total overhead: "+str(self.__totalOverhead))
                             print("Finished")
@@ -265,7 +278,16 @@ class OLSRSimulation:
                 if not sent:
                     packet.retransmit()
                     self.__queues.getQueue(node).pushToFront(packet)
-                        
+        # add the packets being sent out as HELLO packets
+        self.__totalOverhead += self.__numMPR*0.3 # times 0.3 because that is the probability of transmission
+        
+        
+    def returnOverhead(self):
+        return self.__totalOverhead
+    
+    def returnTimeslots(self):
+        return self.__totalTimeslots
+    
     def isFinished(self):
         return self.__finished
     
