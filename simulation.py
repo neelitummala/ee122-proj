@@ -52,29 +52,42 @@ class Simulation:
     """
         Runs various simulations.
     """
-    def __init__(self, grid):
+    def __init__(self, grid, maxTimeslots=100):
         self.grid = grid
         self.neighbors = grid.getNeighborsDict()
+        self.maxTimeslots = maxTimeslots
+        
+        # instantiate neighbors in a better way (by just integers)
+        newDict = {}
+        for key in self.neighbors.keys():
+            keyID = key.getID()
+            nodes = self.neighbors[key]
+            newList = []
+            for n in nodes:
+                newList.append(n.getID())
+            newDict[keyID] = newList
+        self.neighbors = newDict
+        
         self.numNodes = len(self.neighbors)
         self.timeSlot = 0
-   
+           
         # randomly choose the source and destination nodes
-        choice = np.random.choice(numNodes, 2, replace=False)
+        choice = np.random.choice(self.numNodes, 2, replace=False)
         self.source = choice[0]
         self.target = choice[1]
         
-        aodv = AODVSimulation(self.source, self.target, self.numNodes)
+        self.aodv = AODVSimulation(self.source, self.target, self.numNodes)
         
-        while not aodv.isFinished():
-            run()
+        while not self.aodv.isFinished() and self.timeSlot < self.maxTimeslots :
+            self.run()
             
         print('Finished')
         
     def run(self):
         send = transmissions(self.grid, self.numNodes)
-        if not aodv.finished():
-            aodv.step()
-        mutate()
+        if not self.aodv.isFinished():
+            self.aodv.step(self.timeSlot, self.grid, self.neighbors, send)
+        self.mutate()
             
     def mutate(self):
         # mutates grid and updates everything every timeslot
@@ -95,50 +108,50 @@ class AODVSimulation:
         self.__finished = False
         self.__destinationReached = False
         self.__lastTimeout = 0 # time at which the last timeout occurred
-        beginDiscover(0)
+        self.beginDiscover(0)
         
     def beginDiscover(self, timeSlot):
         # put route request packet into source's queue
         packet = RouteRequest(timeSlot, self.__source, self.__target)
         packet.addToPath(self.__source)
-        self.__queues[self.__source].addToBuffer(packet)
+        self.__queues.getQueue(self.__source).pushToBack(packet)
         
-    def step(self, timeSlot, grid, neighbors, transmissions):
+    def step(self, timeSlot, grid, neighborsDict, transmissions):
         # if it has been longer than timeout time slots, put a discovery packet back in the source node's queue
         if timeSlot - self.__lastTimeout > self.__timeout:
-            beginDiscover(timeSlot)
+            self.beginDiscover(timeSlot)
             self.__lastTimeout = timeSlot
             
         for node in transmissions:
-            if self.__queues[node].getBufferLength: # if queue is not empty, send packet out to neighbors
-                neighbors = self.neighbors[node]
-                packet = self.__queues[node].pullFromBuffer()
+            if self.__queues.getQueue(node).getBufferLength(): # if queue is not empty, send packet out to neighbors
+                neighbors = neighborsDict[node]
+                packet = self.__queues.getQueue(node).pullFromBuffer()
                 sent = False
                 for neighbor in neighbors:
-                    if packet.getType() = 'RouteRequest':
+                    if packet.getType() == 'RouteRequest':
                         if neighbor == self.__target and not self.__destinationReached: # so we don't send out multiple replies
                             self.__destinationReached = True
                             reply = RouteReply(timeSlot, neighbor, self.__source, packet.getPath()[::-1])
-                            self.__queues[neighbor].addToBuffer(reply)
+                            self.__queues.getQueue(neighbor).pushToBack(reply)
                         else:
                             newPacket = copy.deepcopy(packet)
                             if neighbor not in packet.getPath():
                                 newPacket.addToPath(neighbor)
-                                self.__queues[neighbor].addToBuffer(newPacket)
+                                self.__queues.getQueue(neighbor).pushToBack(newPacket)
                         sent = True
-                    if packet.getType() = 'RouteReply':
+                    if packet.getType() == 'RouteReply':
                         if neighbor == packet.getDestination(): # done with simulation
                             self.__finished = True
                             return
-                        elif neighbor == packet.getPath[1]: # the neighbor is the next in the backwards path
+                        elif neighbor == packet.getPath()[1]: # the neighbor is the next in the backwards path
                             if packet.getRetransmits() < self._retry: 
                                 packet.setPath(packet.getPath()[1:])
-                                self.__queues[neighbor].addToBuffer(packet)
+                                self.__queues.getQueue(neighbor).pushToBack(packet)
                                 sent = True
                             break
                 if not sent:
                     packet.retransmit()
-                    self.__queues[node].pushToFront(packet)
+                    self.__queues.getQueue(node).pushToFront(packet)
                         
     def getQueues(self):
         return self.__queues

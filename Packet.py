@@ -50,5 +50,8 @@ class RouteReply(Packet):
     def getPath(self):
         return self.__path
     
+    def retransmit(self):
+        self.__retransmits += 1
+    
     def returnRetransmits(self):
         return self.__retransmits

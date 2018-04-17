@@ -1,4 +1,5 @@
 from collections import deque
+import numpy as np
 
 class QueueHolder:
     
@@ -8,18 +9,22 @@ class QueueHolder:
         self.populateQueues()
         
     def populateQueues(self):
-        for node in numNodes:
+        for node in np.arange(self.__numNodes):
             self.__queueHolder[node] = PacketQueue(node)    
     
     def getQueueHolder(self):
-        return self.__queueHolder()
+        return self.__queueHolder
+    
+    def getQueue(self, node):
+        # convert back to string
+        return self.__queueHolder[node]
 
 class PacketQueue:
     
     def __init__(self, node, bufferLimit=5):
         self.__node = node
         self.__bufferLimit = bufferLimit # anything added if the queue is full will be dropped
-        self.__buffer = deque(maxlen=self.__bufferSize) # two-sided queue
+        self.__buffer = deque(maxlen=self.__bufferLimit) # two-sided queue
     
     def getNode(self):
         return self.__node
