@@ -1,5 +1,4 @@
 # TODO:
-# implement moveDevice()
 # implement removeDevice()
 # implement mutate()
 
@@ -8,6 +7,7 @@ from Node import *
 
 import random, math
 import numpy as np
+from collections import deque
 
 class Grid:
     
@@ -102,7 +102,26 @@ class Grid:
             return False
         else:
             return self.__grid[x,y]
-        
+    
+    # mutates the entire swarm
+    # 1. iterate through each device in Grid
+    # 2. get rectangle surrounding device defined by mobility radius
+    # 3. choose a place to move to randomly.
+    # 4. make sure swarm is still contiguous. if not, redo #3
+    # 5. if there are no possible places to move, pop device from fringe and re-add to back
+    # 6. for any device, give up trying to move after 3 tries
+    def mutate(self):
+        fringe = deque([])
+        # add all devices to fringe.
+        for d in self.__devices:
+            fringe.append([d, 0])
+        # do the mutate
+        while len(fringe) != 0:
+            d = fringe.popleft()
+            oldX = d.getCoordinate().getX()
+            oldY = d.getCoordinate().getY()
+            # TODO: finish this
+    
     # moves device from one coordinate to another in Grid
     # 1. make sure device is in Grid
     # 2. make sure new location is empty
