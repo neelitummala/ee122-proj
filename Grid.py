@@ -2,6 +2,12 @@
 # implement removeDevice()
 # implement mutate()
 
+# NOTICE
+# Grid coordinates are NOT in Cartesian format.
+# X coordinates increase from left to right.
+# Y coordinates increase from top to bottom.
+
+
 from Point import *
 from Node import *
 
@@ -13,6 +19,7 @@ class Grid:
     
     # arbitrary definition of Rx/Tx reachable radius
     __radioRadius = 5
+    __mobilityRadius = 4
     
     def __init__(self, size, seed=None):
         # creates a square grid of dimensions size x size
@@ -42,6 +49,7 @@ class Grid:
         return sum / len(neighborLists)
         
     def getSparsity(self):
+        self.__sparsity = self.measureSparsity()
         return self.__sparsity
     
     # generates a list of neighbors for each Node in the grid
@@ -111,16 +119,51 @@ class Grid:
     # 5. if there are no possible places to move, pop device from fringe and re-add to back
     # 6. for any device, give up trying to move after 3 tries
     def mutate(self):
+        # helper function for fast localized neighbor search
+        # returns [upperLeftX, upperLeftY, lowerRightX, lowerRightY]
+        def getRadiusCorners(point):
+            x = point.getX()
+            y = point.getY()
+            ulx = (x - self.__mobilityRadius)
+            uly = (y  - self.__mobilityRadius)
+            lrx = (x + self.__mobilityRadius)
+            lry = (y + self.__mobilityRadius)
+            if ulx < 0:
+                ulx = 0
+            if uly < 0:
+                uly = 0
+            if lrx > (self.__gridsize - 1):
+                lrx = (self.__gridsize - 1)
+            if lry > (self.__gridsize - 1):
+                lry = (self.__gridsize - 1)
+            return [ulx, uly, lrx, lry]
         fringe = deque([])
         # add all devices to fringe.
         for d in self.__devices:
             fringe.append([d, 0])
         # do the mutate
         while len(fringe) != 0:
-            d = fringe.popleft()
+            f = fringe.popleft()
+            d = f[0]
+            i = f[1]
+            if (i >= 3):
+                continue
             oldX = d.getCoordinate().getX()
             oldY = d.getCoordinate().getY()
-            # TODO: finish this
+            ulx, uly, lrx, lry = getRadiusCorners(d.getCoordinate())
+            randX = random.randint(ulx,lrx)
+            randY = random.randint(uly,lry)
+            while (np.sqrt((oldX-randX)**2 + (oldY-randY)**2) > self.__mobilityRadius):
+                randX = random.randint(ulx,lrx)
+                randY = random.randint(uly,lry)
+            n = self.__grid[randX,randY]
+            if n != 0:
+                fringe.append([d,i+1])
+            else:
+                self.moveDevice(oldX, oldY, randX, randY)
+                if (not self.isSingleSwarm()):
+                    self.moveDevice(randX, randY, oldX, oldY)
+                    fringe.append([d,i+1])
     
     # moves device from one coordinate to another in Grid
     # 1. make sure device is in Grid
