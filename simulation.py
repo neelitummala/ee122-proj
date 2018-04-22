@@ -100,6 +100,7 @@ class Simulation:
         # TODO: incorporate Hall's mutate function
         # TODO: update neighbors
         # TODO: update MPRs for OLSR
+        self.grid.mutate()
         self.timeSlot += 1
         return
         
@@ -293,3 +294,12 @@ class OLSRSimulation:
     
     def getMPR(self):
         return self.__MPR
+    
+class CustomSimulation:
+    
+    def __init__(self):
+        self__finished = False
+        
+    def isFinished(self):
+        return self.__finished
+        
