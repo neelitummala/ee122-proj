@@ -228,6 +228,7 @@ class AODVSimulation:
         return self.__totalTimeslots
 
     def returnQueueUsage(self):
+        self.__totalTimeslots = max(1, self.__totalTimeslots)
         return ((self.__queueLength / self.__totalTimeslots) / 10) * 100
     
 class OLSRSimulation:
@@ -353,6 +354,7 @@ class OLSRSimulation:
         return self.__MPR
 
     def returnQueueUsage(self):
+        self.__totalTimeslots = max(1, self.__totalTimeslots)
         return ((self.__queueLength / self.__totalTimeslots) / 10) * 100
     
 class CustomSimulation:
@@ -460,6 +462,7 @@ class CustomSimulation:
         return self.__totalTimeslots
 
     def returnQueueUsage(self):
+        self.__totalTimeslots = max(1, self.__totalTimeslots)
         return ((self.__queueLength / self.__totalTimeslots) / 10) * 100
 
         
