@@ -84,6 +84,8 @@ class Simulation:
         self.numNodes = len(self.neighbors)
         self.maxTimeslots = maxTimeslots # simulation gets cut off after this so we don't infinite loop
         self.timeSlot = 0
+
+        self.sparsity = 0
            
         # randomly choose the source and destination nodes
         choice = np.random.choice(self.numNodes, 2, replace=False)
@@ -101,6 +103,7 @@ class Simulation:
         self.olsr = OLSRSimulation(self.source, self.target, self.numNodes)
         self.olsr.chooseMPR(self.grid, self.numNodes, self.neighbors) # choose multi-point relays for OLSR simulation
         self.custom = CustomSimulation(self.source, self.target, self.numNodes)
+        self.sparsity += self.grid.getSparsity()
 
         # run through the simulations: OLSR, AODV, CUSTOM until they are all done
         while (not self.olsr.isFinished() or not self.aodv.isFinished()) or not self.custom.isFinished() and (self.timeSlot < self.maxTimeslots):
@@ -122,6 +125,7 @@ class Simulation:
         arr.append(self.custom.returnTimeslots())
         arr.append(self.custom.returnOverhead())
         arr.append(self.custom.returnQueueUsage())
+        arr.append(self.sparsity / self.timeSlot)
         return arr
 
     def mutate(self):
@@ -134,6 +138,7 @@ class Simulation:
             if self.timeSlot % 100 == 0:
                 self.olsr.chooseMPR(self.grid, self.numNodes, self.neighbors) # update multi-point relays for OLSR
         self.timeSlot += 1
+        self.sparsity += self.grid.getSparsity()
         return
         
 class AODVSimulation:
