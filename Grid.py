@@ -32,7 +32,7 @@ class Grid:
         self.__idCount = 0
         self.__allNeighbors = {}
         
-        self.populate(int(size*size/5), seed) # guarantees that 1/5 of grid will be occupied
+        self.populate(int(size*size*4/5), seed) # guarantees that 1/5 of grid will be occupied
         self.findNeighbors()
         
         self.__sparsity = self.measureSparsity()
@@ -138,6 +138,7 @@ class Grid:
                 lry = (self.__gridsize - 1)
             return [ulx, uly, lrx, lry]
         fringe = deque([])
+        m = {}
         # add all devices to fringe.
         for d in self.__devices:
             fringe.append([d, 0])
@@ -146,6 +147,7 @@ class Grid:
             f = fringe.popleft()
             d = f[0]
             i = f[1]
+            m[d.getID()] = 0
             if (i >= 3):
                 continue
             oldX = d.getCoordinate().getX()
@@ -160,10 +162,14 @@ class Grid:
             if n != 0:
                 fringe.append([d,i+1])
             else:
+                m[d.getID()] = 1
                 self.moveDevice(oldX, oldY, randX, randY)
                 if (not self.isSingleSwarm()):
+                    m[d.getID()] = 0
                     self.moveDevice(randX, randY, oldX, oldY)
                     fringe.append([d,i+1])
+        
+        return m
     
     # moves device from one coordinate to another in Grid
     # 1. make sure device is in Grid
