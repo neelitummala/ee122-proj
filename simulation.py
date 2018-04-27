@@ -115,7 +115,14 @@ class Simulation:
             
     def end(self):
         # return results
-        return [self.aodv.returnTimeslots(), self.aodv.returnOverhead(), self.olsr.returnTimeslots(), self.olsr.returnOverhead(), self.custom.returnTimeslots(), self.custom.returnOverhead()]
+        arr =  [self.aodv.returnTimeslots(), self.aodv.returnOverhead(), self.aodv.returnQueueUsage()]
+        arr.append(self.olsr.returnTimeslots())
+        arr.append(self.olsr.returnOverhead())
+        arr.append(self.olsr.returnQueueUsage())
+        arr.append(self.custom.returnTimeslots())
+        arr.append(self.custom.returnOverhead())
+        arr.append(self.custom.returnQueueUsage())
+        return arr
 
     def mutate(self):
         # mutates grid and updates everything every timeslot
@@ -147,6 +154,7 @@ class AODVSimulation:
         # measurement variables for comparisons
         self.__totalTimeslots = 0
         self.__totalOverhead = 0
+        self.__queueLength = 0
         
     def beginDiscover(self, timeSlot):
         # put route request packet into source's queue. This happens at the beginning and when we reach timeout
@@ -160,7 +168,13 @@ class AODVSimulation:
         if timeSlot - self.__lastTimeout > self.__timeout: # if timeout occurs, source should send out another RREQ
             self.beginDiscover(timeSlot)
             self.__lastTimeout = timeSlot
-            
+        
+        # record queue length
+        num = 0
+        for node in range(self.__numNodes):
+            num += self.__queues.getQueue(node).getBufferLength()
+        self.__queueLength += (num / self.__numNodes)       
+
         for node in transmissions:
             if self.__queues.getQueue(node).getBufferLength(): # if queue is not empty, send packet out to neighbors
                 neighbors = neighborsDict[node]
@@ -184,10 +198,6 @@ class AODVSimulation:
                         if neighbor == packet.getDestination(): # done with simulation because the reply packet has reached the source
                             self.__finished = True
                             self.__totalTimeslots = timeSlot
-                            print("AODV")
-                            print("Total timeslots: "+str(self.__totalTimeslots))
-                            print("Total overhead: "+str(self.__totalOverhead))
-                            print("Finished")
                             return
                         elif neighbor == packet.getPath()[0]: # the neighbor is the next in the backwards path
                             if packet.getRetransmits() <= self.__retry: 
@@ -211,6 +221,9 @@ class AODVSimulation:
     
     def returnTimeslots(self):
         return self.__totalTimeslots
+
+    def returnQueueUsage(self):
+        return ((self.__queueLength / self.__totalTimeslots) / 10) * 100
     
 class OLSRSimulation:
     
@@ -237,6 +250,7 @@ class OLSRSimulation:
         # measurement variables for comparisons
         self.__totalTimeslots = 0
         self.__totalOverhead = 0
+        self.__queueLength = 0
         
     def beginDiscover(self, timeSlot):
         # put route request packet into source's queue. This happens at the beginning and when we reach timeout
@@ -281,6 +295,12 @@ class OLSRSimulation:
             self.refreshState(timeSlot)
             self.__lastLinkUpdate = timeSlot
 
+        # record queue length
+        num = 0
+        for node in range(self.__numNodes):
+            num += self.__queues.getQueue(node).getBufferLength()
+        self.__queueLength += (num / self.__numNodes) 
+
         for node in transmissions:
             if self.__queues.getQueue(node).getBufferLength(): # if queue is not empty, send packet out to MPRs
                 MPRs = self.__MPR[node]
@@ -294,10 +314,6 @@ class OLSRSimulation:
                             if (packet.getDestination() == MPR) or ((table[packet.getDestination()] > 0) and (table[packet.getDestination()] + self.__linkUpdate >= timeSlot)):
                                 self.__finished = True
                                 self.__totalTimeslots = timeSlot
-                                print("OLSR")
-                                print("Total timeslots: "+str(self.__totalTimeslots))
-                                print("Total overhead: "+str(self.__totalOverhead))
-                                print("Finished")
                                 return
                             elif (self.__received[MPR] is None) or (self.__received[MPR] < packet.getTimeStamp()):
                                 # if we havent received this request before
@@ -330,6 +346,9 @@ class OLSRSimulation:
     
     def getMPR(self):
         return self.__MPR
+
+    def returnQueueUsage(self):
+        return ((self.__queueLength / self.__totalTimeslots) / 10) * 100
     
 class CustomSimulation:
     
@@ -351,12 +370,19 @@ class CustomSimulation:
         # measurement variables for comparisons
         self.__totalTimeslots = 0
         self.__totalOverhead = 0
+        self.__queueLength = 0
 
     def step(self, timeSlot, grid, neighborsDict, transmissions, nodeMovement):
         # if it has been longer than timeout time slots, put a RREQ packet back in the source node's queue
         if timeSlot - self.__lastTimeout > self.__timeout: # if timeout occurs, source should send out another RREQ
             self.beginDiscover(timeSlot)
             self.__lastTimeout = timeSlot
+
+        # record queue length
+        num = 0
+        for node in range(self.__numNodes):
+            num += self.__queues.getQueue(node).getBufferLength()
+        self.__queueLength += (num / self.__numNodes) 
         
         for node in transmissions:
             if self.__queues.getQueue(node).getBufferLength(): # if queue is not empty, send packet out to neighbors
@@ -383,10 +409,6 @@ class CustomSimulation:
                         if neighbor == packet.getDestination(): # FINISHED SIMULATION
                             self.__finished = True
                             self.__totalTimeslots = timeSlot
-                            print("Custom")
-                            print("Total timeslots: "+str(self.__totalTimeslots))
-                            print("Total overhead: "+str(self.__totalOverhead))
-                            print("Finished")
                             return
                         elif self.__brokenPath:
                             if (self.__replyReceived[neighbor] < packet.getTimeStamp()) and (sent < self.__degree):
@@ -431,5 +453,8 @@ class CustomSimulation:
     
     def returnTimeslots(self):
         return self.__totalTimeslots
+
+    def returnQueueUsage(self):
+        return ((self.__queueLength / self.__totalTimeslots) / 10) * 100
 
         
