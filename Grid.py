@@ -1,7 +1,3 @@
-# TODO:
-# implement removeDevice()
-# implement mutate()
-
 # NOTICE
 # Grid coordinates are NOT in Cartesian format.
 # X coordinates increase from left to right.
@@ -21,18 +17,20 @@ class Grid:
     __radioRadius = 5
     __mobilityRadius = 4
     
-    def __init__(self, size, seed=None):
+    def __init__(self, size, r_rad=5, m_rad=4, seed=None):
         # creates a square grid of dimensions size x size
         # grid is a 2D numpy array
         # unpopulated points in the Grid denoted by 0
         
         self.__gridsize = size
+        self.__radioRadius = r_rad
+        self.__mobilityRadius = m_rad
         self.__grid = np.zeros((size,size), dtype=Node)
         self.__devices = []
         self.__idCount = 0
         self.__allNeighbors = {}
         
-        self.populate(int(size*size*4/5), seed) # guarantees that 1/5 of grid will be occupied
+        self.populate(int(size*size*1/5), seed) # guarantees that 1/5 of grid will be occupied
         self.findNeighbors()
         
         self.__sparsity = self.measureSparsity()
