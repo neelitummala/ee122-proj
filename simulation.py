@@ -48,76 +48,97 @@ def transmissions(grid, numNodes):
             transmissions.append(node)
     return transmissions
 
-class Simulation:
+def getNeighbors(neighborsDict):
     """
-        Runs various simulations.
+        Reformat the neighbors dictionary for a grid.
+
+        Parameters
+        ----------
+        neighborsDict: dict
+            dictionary of neighbors for each node in the grid
+
+        Returns
+        -------
+        :dict
+            reformatted dictionary of neighbors in the grid
     """
-    def __init__(self, grid, maxTimeslots=5000):
-        self.grid = grid
-        self.neighbors = grid.getNeighborsDict()
-        self.maxTimeslots = maxTimeslots # simulation gets cut off after this so we don't infinite loop
-        
-        # instantiate neighbors in a better way (by just integers instead of nodes)
-        newDict = {}
-        self.nodes = []
-        for key in self.neighbors.keys():
+    newDict = {}
+        nodes = []
+        for key in neighborsDict.keys():
             keyID = key.getID()
-            self.nodes.append(keyID)
-            neighbors = self.neighbors[key]
+            nodes.append(keyID)
+            neighbors = neighborsDict[key]
             newList = []
             for n in neighbors:
                 newList.append(n.getID())
             newDict[keyID] = newList
-        self.neighbors = newDict
-        
+    return newDict
+
+class Simulation:
+    """
+        Runs various simulations: AODV, OLSR, CUSTOM
+    """
+    def __init__(self, grid, maxTimeslots=5000):
+        self.grid = grid
+        self.neighbors = getNeighbors(self.grid.getNeighborsDict()) 
         self.numNodes = len(self.neighbors)
+        self.maxTimeslots = maxTimeslots # simulation gets cut off after this so we don't infinite loop
         self.timeSlot = 0
            
         # randomly choose the source and destination nodes
         choice = np.random.choice(self.numNodes, 2, replace=False)
         self.source = choice[0]
         self.target = choice[1]
-        
+
+        # dictionary that tells us whether a node has moved since the last time step
+        # instantiate with all zeros
+        self.nodeMovement = {}
+        for node in range(self.numNodes):
+            self.nodeMovement[node] = 0
+
+        # instantiate different simulations: AODV, OLSR, CUSTOM
         self.aodv = AODVSimulation(self.source, self.target, self.numNodes)
         self.olsr = OLSRSimulation(self.source, self.target, self.numNodes)
-        self.olsr.chooseMPR(self.grid, self.nodes, self.neighbors)
+        self.olsr.chooseMPR(self.grid, self.nodes, self.neighbors) # choose multi-point relays for OLSR simulation
+        self.custom = CustomSimulation(self.source, self.target, self.numNodes)
 
+        # run through the simulations: OLSR, AODV, CUSTOM until they are all done
         while (not self.olsr.isFinished() or not self.aodv.isFinished()) and (self.timeSlot < self.maxTimeslots):
-            send = transmissions(self.grid, self.numNodes)
+            send = transmissions(self.grid, self.numNodes) # choose nodes that will successfully transmit in this timeslot
             if not self.aodv.isFinished():
                 self.aodv.step(self.timeSlot, self.grid, self.neighbors, send)
             if not self.olsr.isFinished():
                 self.olsr.step(self.timeSlot, self.grid, self.neighbors, send)
+            if not self.custom.isFinished():
+                self.custom.step(self.timeSlot, self.grid, self.neighbors, send, self.nodeMovement)
             self.mutate()
             
-
     def end(self):
         # return results
         return [self.aodv.returnTimeslots(), self.aodv.returnOverhead(), self.olsr.returnTimeslots(), self.olsr.returnOverhead()]
 
     def mutate(self):
         # mutates grid and updates everything every timeslot
-        # TODO: incorporate Hall's mutate function
-        # TODO: update neighbors
-        # TODO: update MPRs for OLSR
-        self.grid.mutate()
+        self.nodeMovement = self.grid.mutate() # mutate the swarm
+        self.neighbors = getNeighbors(self.grid.getNeighborsDict()) # update neighbors dictionary
+        self.olsr.chooseMPR(self.grid, self.nodes, self.neighbors) # update multi-point relays for OLSR
         self.timeSlot += 1
         return
         
 class AODVSimulation:
     
-    def __init__(self, source, target, numNodes, timeout=100, retry=3):
+    def __init__(self, source, target, numNodes, timeout=100, retry=5):
         self.__source = source
         self.__target = target
         self.__numNodes = numNodes
         self.__timeout = timeout # time before source node resends a discovery packets
         self.__retry = retry # number of times node should try to re-transmit a packet
         self.__queues = QueueHolder(numNodes) # queue for each node
-        self.__finished = False
+        self.__finished = False # whether the simulation is done yet or not
         self.__destinationReached = False # if the target node has been reached with an RREQ
         self.__lastTimeout = 0 # time at which the last timeout occurred
         self.__received = [None]*self.__numNodes # array of timestamps that record what RREQ packet a node has received (so it doesn't retransmit it)
-        self.beginDiscover(0)
+        self.beginDiscover(0) # put RREQ packet in the source's queue
         
         # measurement variables for comparisons
         self.__totalTimeslots = 0
@@ -126,8 +147,8 @@ class AODVSimulation:
     def beginDiscover(self, timeSlot):
         # put route request packet into source's queue. This happens at the beginning and when we reach timeout
         packet = RouteRequest(timeSlot, self.__source, self.__target)
-        packet.addToPath(self.__source)
-        self.__queues.getQueue(self.__source).pushToBack(packet)
+        packet.addToPath(self.__source) 
+        self.__queues.getQueue(self.__source).pushToBack(packet) # add RREQ to the source queue
         self.__received[self.__source] = timeSlot # record the timestamp of the packet
         
     def step(self, timeSlot, grid, neighborsDict, transmissions):
@@ -171,7 +192,7 @@ class AODVSimulation:
                                 sent = True
                                 self.__totalOverhead += 1
                             break
-                if not sent:
+                if not sent: # if the packet hasn't been taken out of the queue and sent, we need to retransmit
                     packet.retransmit()
                     self.__queues.getQueue(node).pushToFront(packet)
                         
@@ -189,12 +210,13 @@ class AODVSimulation:
     
 class OLSRSimulation:
     
-    def __init__(self, source, target, numNodes, timeout=10, retry=3):
+    def __init__(self, source, target, numNodes, timeout=100, retry=5, linkUpdate = 20):
         self.__source = source
         self.__target = target
         self.__numNodes = numNodes
         self.__timeout = timeout # time before source node resends a discovery packets
         self.__retry = retry # number of times node should try to re-transmit a packet
+        self.__linkUpdate = linkUpdate # how often the link state information is sent out
         self.__queues = QueueHolder(numNodes)
         self.__finished = False
         self.__lastTimeout = 0 # time at which the last timeout occurred
@@ -297,8 +319,19 @@ class OLSRSimulation:
     
 class CustomSimulation:
     
-    def __init__(self):
-        self__finished = False
+    def __init__(self, source, target, numNodes, timeout=10, retry=5):
+        self.__source = source
+        self.__target = target
+        self.__numNodes = numNodes
+        self.__timeout = timeout # time before source node resends a discovery packets
+        self.__retry = retry # number of times node should try to re-transmit a packet
+        self.__queues = QueueHolder(numNodes)
+        self.__finished = False
+        self.__lastTimeout = 0 # time at which the last timeout occurred
+        self.__received = [None]*self.__numNodes # array of timestamps that record what RREQ packet a node has received (so it doesn't retransmit it)
+
+    def step(self, timeSlot, grid, neighborsDict, transmissions, nodeMovement):
+        return
         
     def isFinished(self):
         return self.__finished

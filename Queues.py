@@ -21,7 +21,7 @@ class QueueHolder:
 
 class PacketQueue:
     
-    def __init__(self, node, bufferLimit=5):
+    def __init__(self, node, bufferLimit=10):
         self.__node = node
         self.__bufferLimit = bufferLimit # anything added if the queue is full will be dropped
         self.__buffer = deque(maxlen=self.__bufferLimit) # two-sided queue
