@@ -104,15 +104,16 @@ class Simulation:
 
         # run through the simulations: OLSR, AODV, CUSTOM until they are all done
         # while (not self.olsr.isFinished() or not self.aodv.isFinished()) or not self.custom.isFinished() and (self.timeSlot < self.maxTimeslots):
-        while (not self.olsr.isFinished() and (self.timeSlot < self.maxTimeslots)):
+        # while (not self.olsr.isFinished() and (self.timeSlot < self.maxTimeslots)):
         # while (not self.aodv.isFinished() and (self.timeSlot < self.maxTimeslots)):
+        while (not self.custom.isFinished() and (self.timeSlot < self.maxTimeslots)):
             send = transmissions(self.grid, self.numNodes) # choose nodes that will successfully transmit in this timeslot
             # if not self.aodv.isFinished():
                 # self.aodv.step(self.timeSlot, self.grid, self.neighbors, send)
-            if not self.olsr.isFinished():
-                self.olsr.step(self.timeSlot, self.grid, self.neighbors, send)
-            # if not self.custom.isFinished():
-            #     self.custom.step(self.timeSlot, self.grid, self.neighbors, send, self.nodeMovement)
+            # if not self.olsr.isFinished():
+                # self.olsr.step(self.timeSlot, self.grid, self.neighbors, send)
+            if not self.custom.isFinished():
+                self.custom.step(self.timeSlot, self.grid, self.neighbors, send, self.nodeMovement)
             self.mutate()
             
     def end(self):
@@ -124,10 +125,12 @@ class Simulation:
         # mutates every 10 time slots and updates MPRs every 50
         if self.timeSlot % 10 == 0 and self.timeSlot != 0:
             self.nodeMovement = self.grid.mutate() # mutate the swarm
+            self.custom.updateGraphNums(self.nodeMovement)
             self.neighbors = getNeighbors(self.grid.getNeighborsDict()) # update neighbors dictionary
             if self.timeSlot % 100 == 0:
                 self.olsr.chooseMPR(self.grid, self.numNodes, self.neighbors) # update multi-point relays for OLSR
         self.timeSlot += 1
+        print(self.timeSlot)
         return
         
 class AODVSimulation:
@@ -157,7 +160,7 @@ class AODVSimulation:
         self.__received[self.__source] = timeSlot # record the timestamp of the packet
         
     def step(self, timeSlot, grid, neighborsDict, transmissions):
-        # if it has been longer than timeout time slots, put a discovery packet back in the source node's queue
+        # if it has been longer than timeout time slots, put a RREQ packet back in the source node's queue
         if timeSlot - self.__lastTimeout > self.__timeout: # if timeout occurs, source should send out another RREQ
             self.beginDiscover(timeSlot)
             self.__lastTimeout = timeSlot
@@ -245,10 +248,6 @@ class OLSRSimulation:
         packet.addToPath(self.__source)
         self.__queues.getQueue(self.__source).pushToBack(packet)
         self.__received[self.__source] = timeSlot # record the timestamp of the packet
-        
-        # packet = LinkState(timeSlot, self.__target)
-        # packet.addToPath(self.__target)
-        # self.__queues.getQueue(self.__target).pushToBack(packet)
 
     def refreshState(self, timeSlot):
         # if it's time to update the link, put a link state message back in all the queues
@@ -338,20 +337,99 @@ class OLSRSimulation:
     
 class CustomSimulation:
     
-    def __init__(self, source, target, numNodes, timeout=10, retry=5):
+    def __init__(self, source, target, numNodes, timeout=10, degree=1):
         self.__source = source
         self.__target = target
         self.__numNodes = numNodes
         self.__timeout = timeout # time before source node resends a discovery packets
-        self.__retry = retry # number of times node should try to re-transmit a packet
+        self.__degree = degree # number of neighbors to try and send to
         self.__queues = QueueHolder(numNodes)
         self.__finished = False
         self.__lastTimeout = 0 # time at which the last timeout occurred
         self.__received = [None]*self.__numNodes # array of timestamps that record what RREQ packet a node has received (so it doesn't retransmit it)
+        self.__replyReceived = [-1]*self.__numNodes # whether a node has gotten a route reply or not so it doesnt send it again
+        self.__graphNums = [0]*self.__numNodes # keeps track of how many times a node has moved
+        self.__brokenPath = False # if the path on the way back is broken, we have to broadcast the packet
+        self.__destinationReached = False # if the target node has been reached with an RREQ
+
+        # measurement variables for comparisons
+        self.__totalTimeslots = 0
+        self.__totalOverhead = 0
 
     def step(self, timeSlot, grid, neighborsDict, transmissions, nodeMovement):
-        return
+        # if it has been longer than timeout time slots, put a RREQ packet back in the source node's queue
+        if timeSlot - self.__lastTimeout > self.__timeout: # if timeout occurs, source should send out another RREQ
+            self.beginDiscover(timeSlot)
+            self.__lastTimeout = timeSlot
+        
+        for node in transmissions:
+            if self.__queues.getQueue(node).getBufferLength(): # if queue is not empty, send packet out to neighbors
+                neighbors = self.pickNeighbors(copy.deepcopy(neighborsDict[node])) # pick the neighbors with the lowest graph mutation number. 
+                packet = self.__queues.getQueue(node).pullFromBuffer() 
+                sent = 0 # WAS THE ROUTE REPLY SENT DEGREE NUMBER OF TIMES?
+                requestSent = 0 # WAS AN RREQ SENT DEGREE NUMBER OF TIMES?
+                for neighbor in neighbors:
+                    if (packet.getType() == 'RouteRequest') and (requestSent < self.__degree) : # we only want to forward the RREQ to one node unless it's the destination
+                        if neighbor == self.__target and not self.__destinationReached: # so we don't send out multiple replies
+                            self.__destinationReached = True
+                            reply = RouteReply(timeSlot, self.__target, self.__source, packet.getPath()[::-1])
+                            self.__queues.getQueue(neighbor).pushToBack(reply)
+                            requestSent += 1
+                            self.__totalOverhead += 1
+                        elif ((self.__received[neighbor] is None) or (self.__received[neighbor] < packet.getTimeStamp())):
+                            # if we havent received this request before
+                            newPacket = copy.deepcopy(packet) # copy the packet so we don't have pointers
+                            newPacket.addToPath(neighbor)
+                            self.__queues.getQueue(neighbor).pushToBack(newPacket)
+                            self.__received[neighbor] = packet.getTimeStamp()
+                            requestSent += 1
+                            self.__totalOverhead += 1
+                    elif packet.getType() == 'RouteReply':
+                        if neighbor == packet.getDestination(): # FINISHED SIMULATION
+                            self.__finished = True
+                            self.__totalTimeslots = timeSlot
+                            print("Custom")
+                            print("Total timeslots: "+str(self.__totalTimeslots))
+                            print("Total overhead: "+str(self.__totalOverhead))
+                            print("Finished")
+                            return
+                        elif self.__brokenPath:
+                            if (self.__replyReceived[neighbor] < packet.getTimeStamp()) and (sent < self.__degree):
+                                newPacket = copy.deepcopy(packet)
+                                self.__queues.getQueue(neighbor).pushToBack(newPacket)
+                                self.__replyReceived[neighbor] = packet.getTimeStamp()
+                                sent += 1
+                                self.__totalOverhead += 1
+                        elif neighbor == packet.getPath()[0]: # the neighbor is the next in the backwards path
+                            packet.setPath(packet.getPath()[1:])
+                            self.__queues.getQueue(neighbor).pushToBack(packet)
+                            sent += 1
+                            self.__totalOverhead += 1
+                            break
+                if packet.getType() == 'RouteReply' and not sent and not self.__brokenPath: # if the packet hasn't been taken out of the queue and sent, we need to retransmit
+                    # if the packet is a reply to the source, and the path has broken, we need to broadcast the reply
+                    self.__brokenPath = True
+                    for n in neighbors: # broadcast packet to all neighbors
+                        temp = copy.deepcopy(packet)
+                        self.__replyReceived[n] = temp.getTimeStamp()
+                        self.__queues.getQueue(n).pushToFront(temp)
         
     def isFinished(self):
         return self.__finished
+
+    def updateGraphNums(self, nodeMovement):
+        self.__graphNums += nodeMovement
+
+    def pickNeighbors(self, neighbors):
+        neighborGraphNums = [self.__graphNums[i] for i in neighbors]
+        neighbors = [x for _,x in sorted(zip(neighborGraphNums, neighbors))]
+        return neighbors
+
+    def beginDiscover(self, timeSlot):
+        # put route request packet into source's queue. This happens at the beginning and when we reach timeout
+        packet = RouteRequest(timeSlot, self.__source, self.__target)
+        packet.addToPath(self.__source)
+        self.__queues.getQueue(self.__source).pushToBack(packet)
+        self.__received[self.__source] = timeSlot # record the timestamp of the packet
+
         
