@@ -34,7 +34,10 @@ class RouteRequest(Packet):
         
     def getPath(self):
         return self.__path
-        
+
+    def getSource(self):
+        return self.__source
+
 class RouteReply(Packet):
     # AODV route reply packet
     
@@ -60,7 +63,7 @@ class RouteReply(Packet):
     
     def getRetransmits(self):
         return self.__retransmits
-    
+
 class LinkState():
     # OLSR link state packet
     def __init__(self, time_stamp, source):

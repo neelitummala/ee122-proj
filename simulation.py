@@ -210,7 +210,7 @@ class AODVSimulation:
     
 class OLSRSimulation:
     
-    def __init__(self, source, target, numNodes, timeout=100, retry=5, linkUpdate = 20):
+    def __init__(self, source, target, numNodes, timeout=100, retry=5, linkUpdate=20):
         self.__source = source
         self.__target = target
         self.__numNodes = numNodes
@@ -220,11 +220,13 @@ class OLSRSimulation:
         self.__queues = QueueHolder(numNodes)
         self.__finished = False
         self.__lastTimeout = 0 # time at which the last timeout occurred
+        self.__lastLinkUpdate = 0 # the last time the link state messages were passed around
         self.__received = [None]*self.__numNodes # array of timestamps that record what RREQ packet a node has received (so it doesn't retransmit it)
-        self.__MPR = {}
+        self.__MPR = {} # MPRS for each node
+        self.__routingTables = {} # for each node, has a list of the timestamps for when the node received a link state message for that node
         for node in np.arange(numNodes):
             self.__MPR[node] = []
-        self.__routingTable = [0]*self.__numNodes
+            self.__routingTables[node] = [0]*self.__numNodes
         self.__numMPR = 0
         self.beginDiscover(0)
         
@@ -242,6 +244,12 @@ class OLSRSimulation:
         packet = LinkState(timeSlot, self.__target)
         packet.addToPath(self.__target)
         self.__queues.getQueue(self.__target).pushToBack(packet)
+
+    def refreshState(self, timeSlot):
+        # if it's time to update the link, put a link state message back in all the queues
+        for node in range(self.__numNodes):
+            packet = LinkState(timeSlot, node)
+            self.queues.getQueue(node).pushToBack(packet)
         
     def chooseMPR(self, grid, nodes, neighborsDict):
         # gather all two-hop neighbors
@@ -267,16 +275,22 @@ class OLSRSimulation:
         if timeSlot - self.__lastTimeout > self.__timeout: # if timeout occurs, source should send out another RREQ
             self.beginDiscover(timeSlot)
             self.__lastTimeout = timeSlot
-            
+        
+        # if it has been longer than linkUpdate time slots, all the nodes should send out link states again
+        if timeSlot - self.__lastLinkUpdate > self.__linkUpdate:
+            self.refreshState(timeSlot)
+            self.__lastLinkUpdate = timeSlot
+
         for node in transmissions:
             if self.__queues.getQueue(node).getBufferLength(): # if queue is not empty, send packet out to MPRs
                 MPRs = self.__MPR[node]
                 packet = self.__queues.getQueue(node).pullFromBuffer() 
                 sent = False # if the packet doesn't get sent this whole loop, we need to retransmit it
-                for MPR in MPRs:
+                for MPR in MPRs: # packets are only forwarded to MPRs
                     if packet.getType() == 'RouteRequest':
-                        # if the destination is in the neighbor's routing table, then there is a route and we've finished
-                        if self.__routingTable[node] == 1:
+                        table = self.__routingTables[MPR]
+                        # if the destination is in the neighbor's routing table and it's up to date, then there is a route and we've finished
+                        if (packet.getDestination() == MPR) or ((table[packet.getDestination()] > 0) and (table[packet.getDestination()] + self.__linkUpdate >= timeSlot)):
                             self.__finished = True
                             self.__totalTimeslots = timeSlot
                             print("OLSR")
@@ -293,17 +307,15 @@ class OLSRSimulation:
                         sent = True
                         self.__totalOverhead += 1
                     if packet.getType() == 'LinkState':
-                        self.__routingTable[node] = 1
-                        newPacket = copy.deepcopy(packet) # copy the packet so we don't have pointers
-                        newPacket.addToPath(MPR)
-                        self.__queues.getQueue(MPR).pushToBack(newPacket)
-                        self.__totalOverhead += 1
+                        if table[packet.getSource()] < packet.getTimeStamp(): # only send the packet if it's new and hasn't been seen before
+                            table[packet.getSource()] = packet.getTimeStamp()
+                            newPacket = copy.deepcopy(packet) # copy the packet so we don't have pointers
+                            newPacket.addToPath(MPR)
+                            self.__queues.getQueue(MPR).pushToBack(newPacket)
+                            self.__totalOverhead += 1
                 if not sent:
                     packet.retransmit()
-                    self.__queues.getQueue(node).pushToFront(packet)
-        # add the packets being sent out as HELLO packets
-        self.__totalOverhead += self.__numMPR*0.3 # times 0.3 because that is the probability of transmission
-        
+                    self.__queues.getQueue(node).pushToFront(packet)        
         
     def returnOverhead(self):
         return self.__totalOverhead
