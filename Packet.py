@@ -5,6 +5,7 @@ class Packet:
         self.__time_stamp = time_stamp # when the packet originated
         self.__source = source # the source
         self.__destination = destination # the target
+        self.__retransmits = 0
 
     def getTimeStamp(self):
         # get packet time stamp
@@ -17,6 +18,14 @@ class Packet:
     def getDestination(self):
         # get packet destination
         return self.__destination
+    
+    def retransmit(self):
+        # when the packet gets sent back into a queue, increment the number of times it has been re-transmitted.
+        # this happens when a reverse path gets broken by movement of the swarm
+        self.__retransmits += 1
+    
+    def getRetransmits(self):
+        return self.__retransmits
 
 class RouteRequest(Packet):
     # AODV route request packet 
@@ -35,9 +44,6 @@ class RouteRequest(Packet):
     def getPath(self):
         return self.__path
 
-    def getSource(self):
-        return self.__source
-
 class RouteReply(Packet):
     # AODV route reply packet
     
@@ -45,7 +51,6 @@ class RouteReply(Packet):
         Packet.__init__(self, time_stamp, source, destination)
         self.__type = 'RouteReply'
         self.__path = path # reverse path from target -> source
-        self.__retransmits = 0 # number of times this packet has been retransmitted
 
     def getType(self):
         return self.__type
@@ -55,14 +60,6 @@ class RouteReply(Packet):
         
     def getPath(self):
         return self.__path
-    
-    def retransmit(self):
-        # when the packet gets sent back into a queue, increment the number of times it has been re-transmitted.
-        # this happens when a reverse path gets broken by movement of the swarm
-        self.__retransmits += 1
-    
-    def getRetransmits(self):
-        return self.__retransmits
 
 class LinkState():
     # OLSR link state packet
@@ -76,7 +73,7 @@ class LinkState():
     def getSource(self):
         return self.__source
     
-    def getTimestamp(self):
+    def getTimeStamp(self):
         return self.__timeStamp
     
     def getType(self):
