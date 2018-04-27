@@ -22,6 +22,8 @@ class Grid:
         # grid is a 2D numpy array
         # unpopulated points in the Grid denoted by 0
         
+        pop_density = 1/5
+        
         self.__gridsize = size
         self.__radioRadius = r_rad
         self.__mobilityRadius = m_rad
@@ -30,8 +32,21 @@ class Grid:
         self.__idCount = 0
         self.__allNeighbors = {}
         
-        self.populate(int(size*size*1/5), seed) # guarantees that 1/5 of grid will be occupied
+        self.populate(int(size*size*pop_density), seed) # guarantees that 1/5 of grid will be occupied
         self.findNeighbors()
+        
+        while (not self.isSingleSwarm()):
+            seed += 100
+            self.__gridsize = size
+            self.__radioRadius = r_rad
+            self.__mobilityRadius = m_rad
+            self.__grid = np.zeros((size,size), dtype=Node)
+            self.__devices = []
+            self.__idCount = 0
+            self.__allNeighbors = {}
+            
+            self.populate(int(size*size*pop_density), seed) # guarantees that 1/5 of grid will be occupied
+            self.findNeighbors()
         
         self.__sparsity = self.measureSparsity()
         
@@ -180,10 +195,10 @@ class Grid:
     def moveDevice(self, currX, currY, newX, newY):
         if type(self.__grid[currX, currY]) != Node:
             print("No Node found at " + str(Point(currX, currY)))
-            return False
+            assert False
         elif type(self.__grid[newX, newY]) == Node:
             print(str(Point(newX, newY)) + " is not empty")
-            return False
+            assert False
         else:
             movingNode = self.__grid[currX, currY]
             oldNeighbors = self.__allNeighbors[movingNode]
